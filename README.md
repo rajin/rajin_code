@@ -44,7 +44,7 @@ process, the name will be NGC1010_035.fits
 There on prefixes will be added with respect to the task that has been applied on the data. Below is a table for the 
 prefix used and there meaning
 
-prefix        task
+prefix    -    task
 
 'c'      -       ccdgap filling with an interpolation value,
 
