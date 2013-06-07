@@ -22,6 +22,9 @@ How to input data so that the code run smoothly?
 The code can only calibrate 1 ARC spectra when running.
 Therefore it would be good idea to select all images (science, flats, etc) to be calibrated by that ARC and paste 
 all of them (along with the ARC) in a folder.
+The code NEEDS to have an ARC file inside the folder where it is running to run. In the eventuality that you want to 
+use an already calibrated ARC file for your data, paste both the ARC fits file along with the iraf database folder
+containing the caliubrated information. 
 Also put the code inside the directory where the images are, to run it.
 The code has the ability to create a master flat and use it to to flat-fielding of the data but for safety, if there 
 are flats, the code will create 2 sets of data: 1 where flat-fielding is done and the other where no flat fielding is
@@ -42,23 +45,23 @@ There on prefixes will be added with respect to the task that has been applied o
 prefix used and there meaning
 
 prefix        task
-'c'      -       ccdgap filling with an interpolation value
-'la'     -       cosmic ray removal through LA cosmic
-'fl'     -       Flat fielding applied
-'t'      -       transformed frame -> wavelength calibration applied
-'b'      -       background subtraction applied
-'til'    -       tilt correction applied through Apall function 
+'c'      -       ccdgap filling with an interpolation value,
+'la'     -       cosmic ray removal through LA cosmic,
+'fl'     -       Flat fielding applied,
+'t'      -       transformed frame -> wavelength calibration applied,
+'b'      -       background subtraction applied,
+'til'    -       tilt correction applied through Apall function, 
 
-'err'    -       error file
-'terr'   -       transformed error file
-'dterr'  -       divided error file (tranformed error file is divided by corresponding background subtracted science file)
-'tildterr'  -    tilt corrected error file (the frame has gone through the 3 steps above)
+'err'    -       error file,
+'terr'   -       transformed error file,
+'dterr'  -       divided error file (tranformed error file is divided by corresponding background subtracted science file),
+'tildterr'  -    tilt corrected error file (the frame has gone through the 3 steps above),
 
-'ARC'     -      the Arc file 
-'FLAT'    -      Flat field images
-'com_flat'  -    combined image of the flat fields
-'ilcom_flat'  -  illumination corrected combined flat field
-'master_flat' -  The master flat image which is a normalised image of the previous step
+'ARC'     -      the Arc file,
+'FLAT'    -      Flat field images,
+'com_flat'  -    combined image of the flat fields,
+'ilcom_flat'  -  illumination corrected combined flat field,
+'master_flat' -  The master flat image which is a normalised image of the previous step,
 
 ====================================================================================================================
 contact
