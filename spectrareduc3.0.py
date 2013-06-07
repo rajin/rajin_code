@@ -5,9 +5,9 @@ Please consult the readme file to understand how it works.
 
 import numpy as np
 #import matplotlib as plt
+from pyraf import iraf
 from pyraf.iraf import noao
 from pyraf.iraf import stsdas
-from pyraf import iraf
 import pyfits as pft
 import os,sys,glob,string,time
 import math as mth
