@@ -42,23 +42,23 @@ There on prefixes will be added with respect to the task that has been applied o
 prefix used and there meaning
 
 prefix        task
-c             ccdgap filling with an interpolation value
-la            cosmic ray removal through LA cosmic
-fl            Flat fielding applied
-t             transformed frame -> wavelength calibration applied
-b             background subtraction applied
-til           tilt correction applied through Apall function 
+'c'      -       ccdgap filling with an interpolation value
+'la'     -       cosmic ray removal through LA cosmic
+'fl'     -       Flat fielding applied
+'t'      -       transformed frame -> wavelength calibration applied
+'b'      -       background subtraction applied
+'til'    -       tilt correction applied through Apall function 
 
-err           error file
-terr          transformed error file
-dterr         divided error file (tranformed error file is divided by corresponding background subtracted science file)
-tildterr      tilt corrected error file (the frame has gone through the 3 steps above)
+'err'    -       error file
+'terr'   -       transformed error file
+'dterr'  -       divided error file (tranformed error file is divided by corresponding background subtracted science file)
+'tildterr'  -    tilt corrected error file (the frame has gone through the 3 steps above)
 
-ARC           the Arc file 
-FLAT          Flat field images
-com_flat      combined image of the flat fields
-ilcom_flat    illumination corrected combined flat field
-master_flat   The master flat image which is a normalised image of the previous step
+'ARC'     -      the Arc file 
+'FLAT'    -      Flat field images
+'com_flat'  -    combined image of the flat fields
+'ilcom_flat'  -  illumination corrected combined flat field
+'master_flat' -  The master flat image which is a normalised image of the previous step
 
 ====================================================================================================================
 contact
