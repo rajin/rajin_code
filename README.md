@@ -12,7 +12,7 @@ There is a know issue with Python 2.7 that IRAF pop-up windows fails to load due
 cases though it could run.
 It would be good to load the following packages: noao, onedspec, twodspec, longslit, apextract, stsdas, imred, ccdred
 in your IRAF default login.cl file found in your IRAf home folder.
-Also there are some files (ARC line-list, LA-Cosmic file) that you need to paste in your IRAF home folder for the code
+Also there are some files (ARC line-list (has extension '.txt'), LA-Cosmic file (lacos_spec.cl)) that you need to paste in your IRAF home folder for the code
 to work
 
 ====================================================================================================================
