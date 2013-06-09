@@ -58,37 +58,32 @@ def identify(properties,index,irafhome):
 	return
     
 #------------------------------------------------------------------------------------------------------------------------------------
-
+#function to fill the ccd gap with an interpolation value
 def ccdgap(name):
 	fimg = pft.open(name)
 	prihdr = fimg[0].header
 	scidata = fimg[0].data
-	
+
 	n1 = prihdr['NAXIS1']
 	n2 = prihdr['NAXIS2']
 
-	a,b = 1023, 1075 #variables to store the ccd 1st gap coord
-	c,d = 2100, 2147 #variables to store the ccd 2nd gap coord
+	#below are the 4 coordinates of edge of the ccd gap
+	a = ccd_locate(scidata)[0]-4;b = ccd_locate(scidata)[1]+2;c = ccd_locate(scidata)[2]-2;d = ccd_locate(scidata)[3]+3
 	e = n2 #ccd height
 
-	for i in range(0,e):
-	   avside1 = avside2 = avside3 = avside4 = 0.0
-	   grad1 = grad2 = c1 = c2 = 0.0
-	   for j in range(1,6):
-	      avside1 = avside1 + (scidata[i,a-(j+2)]/5.0)
-	      avside2 = avside2 + (scidata[i,b+(j+2)]/5.0)	
-	      avside3 = avside3 + (scidata[i,c-(j+2)]/5.0)
-	      avside4 = avside4 + (scidata[i,d+(j+2)]/5.0)
+	gap1_part1 = (scidata[:,a-6:a-1].sum(axis=1))/5.0
+	gap1_part2 = (scidata[:,b+1:b+6].sum(axis=1))/5.0
+	gap2_part1 = (scidata[:,c-6:c-1].sum(axis=1))/5.0
+	gap2_part2 = (scidata[:,d+1:d+6].sum(axis=1))/5.0
+	
+	grad1 = (gap1_part2-gap1_part1)/((b-a)+5.0)
+	grad2 = (gap2_part2-gap2_part1)/((d-c)+5.0)
 
-	   grad1 = (avside2-avside1)/((b-a)+5.0)
-	   grad2 = (avside4-avside3)/((d-c)+5.0)
-	   c1 = scidata[i,a-5]
-	   c2 = scidata[i,c-5]
+	for i in range(a,b):
+		scidata[:,i] = grad1*((i-a)+2)+gap1_part1
 
-	   for j in range(0,(b-a)+1):
-	      scidata[i,a+(j-1)] = grad1*(j+5.)+avside1
-	   for j in range(0,(d-c)):
-	      scidata[i,c+(j-1)] = grad2*(j+5.)+avside3
+	for i in range(c,d):
+		scidata[:,i] = grad2*((i-c)+2)+gap2_part1
 
 	namec = "c"+name
 	pft.writeto(namec,data=scidata,header=prihdr,clobber=True)
@@ -96,6 +91,13 @@ def ccdgap(name):
 	os.system('mv %s history/' % (name))
 	return
 
+#------------------------------------------------------------------------------------------------------------------------------------
+#function to help locate the ccd gap automatically
+def ccd_locate(data):
+	sum_col = data.sum(axis=0) # summing over each row of the image
+	first_gap = np.where(sum_col[0:len(sum_col)/2] == 0)[0]
+	second_gap = (len(sum_col)/2)+np.where(sum_col[len(sum_col)/2:] == 0)[0]
+	return first_gap[0],first_gap[-1],second_gap[0],second_gap[-1]
 #------------------------------------------------------------------------------------------------------------------------------------
 
 def lacosmic(name,irafhome):
