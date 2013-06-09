@@ -1,6 +1,8 @@
 '''Main code that should be run for the spectral reduction of SALT longslit data
 Please consult the readme file to understand how it works.
 
+Version = 3.0
+
 '''
 
 import numpy as np
