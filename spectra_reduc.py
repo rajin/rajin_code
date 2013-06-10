@@ -107,7 +107,7 @@ def lacosmic(name,irafhome):
 	outname = 'la'+name
 	pl = 'mask'+name
 	iraf.lacos_spec(input=name,output=outname,outmask=pl,gain=1.,readn=2.89,
-				xorder=9,yorder=0,sigclip=4.5,sigfrac=0.5,objlim=1.,niter=1,verbose='yes',mode='al')
+				xorder=9,yorder=0,sigclip=4.5,sigfrac=0.5,objlim=1.,niter=7,verbose='yes',mode='al')
 	old = time.time()
 	os.system('ds9 %s %s &' % (pl,outname))
 	os.system('mv %s history/' % (name))
