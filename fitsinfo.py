@@ -8,7 +8,7 @@ import math as mth
 
 #function to read the header of fits files and output a few critical info needed in the program
 def info_fits(fits_name):
-  dummy_list = []
+	dummy_list = []
 	fimg = pft.open(fits_name)
 	prihdr = fimg[0].header
 	try:prihdr1 = fimg[1].header
