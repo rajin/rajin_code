@@ -1,7 +1,7 @@
 '''Main code that should be run for the spectral reduction of SALT longslit data
 Please consult the readme file to understand how it works.
 
-Version = 3.0
+Version = 3.1
 
 '''
 
@@ -10,6 +10,7 @@ import numpy as np
 from pyraf import iraf
 from pyraf.iraf import noao
 from pyraf.iraf import stsdas
+
 import pyfits as pft
 import os,sys,glob,string,time
 import math as mth
@@ -20,41 +21,41 @@ import math as mth
 #Function which applies the following iraf task on an ARC image: Identify, Reidentify, Fitcoords, transform
 
 def identify(properties,index,irafhome):
-   satis = 'n'
-   while satis == 'n':
-  properties = np.array(properties)
-	print properties
-	filename = properties[index,0]
-	lampid = properties[index,2]
-	path = irafhome+lampid+'.txt'
- 	print path,filename
-	iraf.noao.twodspec.longslit.identify(images=filename, section='middle line', databas='database',
+	satis = 'n'
+	while satis == 'n':
+	        properties = np.array(properties)
+		print properties
+		filename = properties[index,0]
+		lampid = properties[index,2]
+		path = irafhome+lampid+'.txt'
+	 	print path,filename
+		iraf.noao.twodspec.longslit.identify(images=filename, section='middle line', databas='database',
 			            	coordli=path, units='',nsum=10,match=-3., maxfeat=50, zwidth=100.,ftype='emission',
 				    	fwidth=5., cradius=6., thresho=0., minsep=2.,functio='spline3',order=3,sample= '*',
-				    	niterat=0, low_rej=3., high_re=3., grow=0.,autowri='no', graphic='stdgraph', cursor='',  	       			    	crval='',cdelt='',aidpars='',mode='ql')
-	iraf.noao.twodspec.longslit.reidentify(referenc=filename,images=filename,interac='no',section='middle line',newaps='yes',
+				    	niterat=0, low_rej=3., high_re=3., grow=0.,autowri='no', graphic='stdgraph', cursor='',  	       					    	crval='',cdelt='',aidpars='',mode='ql')
+		iraf.noao.twodspec.longslit.reidentify(referenc=filename,images=filename,interac='no',section='middle line',newaps='yes',
 					overrid='no',refit='no',trace='no',step=10.,nsum=10.,shift=0.,search=5.,nlost=10.,
 					cradius=5.,thresho=0.,addfeat='no',coordli=path,match=-3,maxfeat=50,minsep=2,
 					databas='database',logfile='logfile',plotfil='',verbose='yes',graphic='stdgraph',
 					cursor='',answer='yes',crval='',cdelt='',aidpars='',mode='ql')
-	namesplit = string.split(filename,'.')
-	iraf.noao.twodspec.longslit.fitcoords(images=str(namesplit[0]),fitname='',interac='yes',combine='no',
+		namesplit = string.split(filename,'.')
+		iraf.noao.twodspec.longslit.fitcoords(images=str(namesplit[0]),fitname='',interac='yes',combine='no',
 					databas='database',deletio='deletions.db',
 					functio='chebyshev',xorder=6,yorder=6,logfile='STDOUT,logfile',plotfil='plotfile',
 					graphic='stdgraph',cursor ='',mode='ql')
-	trans = 't'+filename
-	iraf.noao.twodspec.longslit.transform(input=filename,output=trans,minput='',moutput='',fitnames=namesplit[0],
+		trans = 't'+filename
+		iraf.noao.twodspec.longslit.transform(input=filename,output=trans,minput='',moutput='',fitnames=namesplit[0],
 					databas='database',
 					interpt='spline3',x1='INDEF',x2='INDEF',dx='INDEF',nx='INDEF',xlog='no',y1='INDEF',
 					y2='INDEF',dy='INDEF',ny='INDEF',ylog='no',flux='yes',blank='INDEF',
 					logfile='STDOUT,logfile',mode='ql')
-	os.system('ds9 %s &' % (trans))
-	satis = str(raw_input("Are satisfied with the transformed spectra (y|n)?"))
-	if (satis == 'n'):
-	  askdel = str(raw_input("Delete the spectra and database (y|n)?"))
-	  if (askdel == 'y'):
-		os.system('rm -r database/ %s deletion.db' % (trans))
-	os.system('mv %s %s history/' % (filename,trans))
+		os.system('ds9 %s &' % (trans))
+		satis = input_str("Are satisfied with the transformed spectra (y|n)? :")
+		if (satis == 'n'):
+			askdel = input_str("Delete the spectra and database (y|n)? :")
+			if (askdel == 'y'):
+				os.system('rm -r database/ %s deletion.db' % (trans))
+		os.system('mv %s %s history/' % (filename,trans))
 	return
     
 #------------------------------------------------------------------------------------------------------------------------------------
@@ -106,7 +107,7 @@ def lacosmic(name,irafhome):
 	outname = 'la'+name
 	pl = 'mask'+name
 	iraf.lacos_spec(input=name,output=outname,outmask=pl,gain=1.,readn=2.89,
-				xorder=9,yorder=0,sigclip=4.5,sigfrac=0.5,objlim=1.,niter=7,verbose='yes',mode='al')
+				xorder=9,yorder=0,sigclip=4.5,sigfrac=0.5,objlim=1.,niter=1,verbose='yes',mode='al')
 	old = time.time()
 	os.system('ds9 %s %s &' % (pl,outname))
 	os.system('mv %s history/' % (name))
@@ -136,18 +137,18 @@ def science(sciname,filename):
 #------------------------------------------------------------------------------------------------------------------------------------
 
 def apall(apname,jj,refnam):
-   satis = 'n'
-   while (satis == 'n'):
-	outname = 'til'+apname
-	refname=''
-	interap ='yes'
-	if (jj>1):
-		apallans = str(raw_input("Do you want to apply the same solution as the previous frame (y|n)?"))
-		if (apallans == 'y'):
-			refname=refnam
-			interap ='no'
+	satis = 'n'
+	while (satis == 'n'):
+		outname = 'til'+apname
+		refname=''
+		interap ='yes'
+		if (jj>1):
+			apallans = input_str("Do you want to apply the same solution as the previous frame (y|n)?")
+			if (apallans == 'y'):
+				refname=refnam
+				interap ='no'
 
-	iraf.noao.twodspec.apextract.apall(input=apname,output=outname,apertur='',format='strip',referen=refname,profile='',
+		iraf.noao.twodspec.apextract.apall(input=apname,output=outname,apertur='',format='strip',referen=refname,profile='',
 						interac=interap,find=interap,recente=interap,resize=interap,edit=interap,trace=interap,
 						fittrac=interap,extract='yes',extras='no',review='no',line=500,nsum=30,
 						lower=-5.,upper=12.,apidtab='',b_funct='chebyshev',b_order=1,b_sampl='-60:-40,40:60',
@@ -158,16 +159,16 @@ def apall(apname,jj,refnam):
 						t_order=3,t_sampl='*',t_naver=1,t_niter=0,t_low_r=3.,t_high_=3.,t_grow=0.,
 						backgro='none',skybox=1,weights='none',pfit='fit1d',clean='no',saturat='INDEF',
 						readnoi=0.,gain=1.,lsigma=4.,usigma=4.,nsubaps=1.,mode='ql')
-	namesplit = string.split(outname,'.')
-	os.system('ds9 %s &' % (namesplit[0]+'.0001.fits'))
-	satis = str(raw_input("Are satisfied with the extracted spectra (y|n)?"))
-	if (satis == 'n'):
-		askdel = str(raw_input("Delete the spectra (y|n)?"))
-		if (askdel == 'y'):
-			os.system('rm %s' % (namesplit[0]+'.0001.fits'))
-	else:
-		os.system('mv %s history/' % (apname))
-	return
+		namesplit = string.split(outname,'.')
+		os.system('ds9 %s &' % (namesplit[0]+'.0001.fits'))
+		satis = input_str("Are satisfied with the extracted spectra (y|n)?")
+		if (satis == 'n'):
+			askdel = input_str("Delete the spectra (y|n)?")
+			if (askdel == 'y'):
+				os.system('rm %s' % (namesplit[0]+'.0001.fits'))
+		else:
+			os.system('mv %s history/' % (apname))
+		return
 
 #------------------------------------------------------------------------------------------------------------------------------------
 def err(name,name1):
@@ -296,19 +297,6 @@ def info_fits(fits_name):
 	except:object_n = 'NONE'	
 	dummy_list = [fits_name,naxis2,lampid,grating,gr_angle,object_n]
 	return dummy_list
-#------------------------------------------------------------------------------------------------------------------------------------
-def input_val(script,lim1,lim2):
-	while True:
-	   try:
-	       value = int(raw_input('%s : ' % (script)))
-	   except ValueError: # just catch the exceptions you know!
-	       print 'That\'s not a number!'
-	   else:
-	       if lim1 <= value < lim2: # this is faster
-	           break
-	       else:
-	           print 'Out of range. Try again'
-	return value
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
@@ -352,12 +340,12 @@ def flat(flist):
 	n1 = prihdr['NAXIS1']
 	n2 = prihdr['NAXIS2']
 	satis = 'n'
-	while satis == 'n' or satis =='no':
+	while satis == 'n':
 		y0 = input_val('Enter the first y-coord from where the mean will be computed, y0',0,n2)
 		y1 = input_val('Enter the second y-coord from where the mean will be computed, y1',y0,n2)
 		x0 = input_val('Enter the first x-coord from where the mean will be computed, x0',0,n1)
 		x1 = input_val('Enter the second x-coord from where the mean will be computed, x1',x0,n1)
-		satis = str(raw_input('Are you satisfied with the coordinates input(y or n): '))
+		satis = input_str('Are you satisfied with the coordinates input(y or n): ')
 	mean_flux = np.mean(scidata[y0:y1,x0:x1])
 	scidata1 = scidata/mean_flux
 	new_name = 'master_flat.fits'
@@ -384,12 +372,48 @@ def trim(imname,x,y):
 	os.system('mv %s history/' % (imname))
 
 #------------------------------------------------------------------------------------------------------------------------------------
+def input_val(script,lim1,lim2):
+	while True:
+	   try:
+	       value = int(raw_input('%s : ' % (script)))
+	   except ValueError: # just catch the exceptions you know!
+	       print 'That\'s not a number!'
+	   else:
+	       if lim1 <= value < lim2: 
+	           break
+	       else:
+	           print 'Out of range. Try again'
+	return value
+
+#------------------------------------------------------------------------------------------------------------------------------------
+
+def input_str(script):
+	while True:
+		userInput = str(raw_input('%s' % (script)))
+		if len(userInput) == 1:
+			if userInput in string.letters:
+				if userInput.lower() == 'y' or userInput.lower() == 'n':		
+					break
+				print 'Please enter only "y" or "n"'
+			else:
+				print 'Please enter only letters!'
+		elif len(userInput) == 0:
+			print 'Please enter at least 1 character!'
+		elif len(userInput) >1 and userInput.isalpha():
+			print 'Please enter only 1 character!'
+		else:
+			print 'Please enter only letters and no numbers'
+	return userInput.lower()
+
+#------------------------------------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------------------------------------------
 
-irafhome = '/home/rajin/iraf/'
 
-# opening a file
+#change this to your home iraf directory (dont forget to save the line list files in that folder)
+irafhome = '/home/vinesh/iraf/'
+
+# creating a history directory which will backup all the fits file done in previous steps of reduction
 os.system('mkdir history')
 files = glob.glob('*fits')
 #renaming the files to more appropriate names!
@@ -401,7 +425,7 @@ for i in range(0,len(files)):
 #Applying trimming if necessary
 files = glob.glob('*fits')
 os.system('ds9 %s &' % (files[0]))
-trim_ans = str(raw_input("Do you want to apply any trimming (y|n)?"))
+trim_ans = input_str("Do you want to apply any trimming (y|n)?")
 if trim_ans == 'y':
 	satis = 'n'
 	while satis == 'n' or satis =='no':
@@ -409,7 +433,7 @@ if trim_ans == 'y':
 		y1 = input_val('Enter the second y-coord, y1',y0,2500)
 		x0 = input_val('Enter the first x-coord, x0',0,3180)
 		x1 = input_val('Enter the second x-coord, x1',x0,3180)
-		satis = str(raw_input('Are you satisfied with the coordinate input(y or n): '))
+		satis = input_str('Are you satisfied with the coordinate input(y or n): ')
 	x = [x0,x1] ; y = [y0,y1]
 	for i in range(0,len(files)):
 		trim(files[i],x,y)
@@ -440,13 +464,13 @@ print 'This program aims to do the spectral reduction for salt data'
 
 #This section will use the function identify to go through the identification of the Arc along with other functions to transform the 
 #arc. To transform the arc, a function is created and this same function will later be applied on to the other (science) frames.
-arc_lamp = str(raw_input("Do you want to identify the arc lamp (y|n)?"))
+arc_lamp = input_str("Do you want to identify the arc lamp (y|n)? :")
 if (arc_lamp == 'y'):
 	identify(properties,ident,irafhome)
 
 prefix =''
 #This section interpolates across ccd gap to get better results later when the background is subtracted
-ccdgp = str(raw_input("Do you want to fill the ccd gaps of the science frames with a gradient function(y|n)?"))
+ccdgp = input_str("Do you want to fill the ccd gaps of the science frames with a gradient function(y|n)? :")
 if (ccdgp == 'y'):
 	for j in range(0,len(science_list)):
 		ccdgpname = prefix+science_list[j]
@@ -455,7 +479,7 @@ if (ccdgp == 'y'):
 
 #This section will use lacosmic to remove cosmic ray only on the science frames. Check the settings in the lacomic
 #function of this code to your liking
-lacos = str(raw_input("Do you want to treat science frame for cosmic ray removal with lacosmics (y|n)?"))	
+lacos = input_str("Do you want to treat science frame for cosmic ray removal with lacosmics (y|n)? :")
 mask = []
 if (lacos == 'y'):
 	for j in range(0,len(science_list)):
@@ -476,7 +500,7 @@ for i in range(0,len(mask)):
 	os.system('mv %s history/' % ('mask'+mask[i]))
 
 #Here we have the start of the calculation for the error frames
-errorans = str(raw_input("Do you want to  compute error frames (y|n)?"))
+errorans = input_str("Do you want to  compute error frames (y|n)? :")
 error=[] ; errorflt = []
 if (errorans == 'y'):
 	for j in range(0,len(science_list)):
@@ -537,7 +561,7 @@ if (len(errorflt) != 0):
 	
 
 apname1=''
-apallext = str(raw_input("Do you want to extract your 2D aperture and correct for tilt(y|n)?"))
+apallext = input_str("Do you want to extract your 2D aperture and correct for tilt(y|n)? :")
 if (apallext == 'y'):
 	count = 0
 	for j in range(0,len(science_list)):
@@ -549,6 +573,7 @@ if (apallext == 'y'):
 
 	if flat_detec == 'yes':
 		for j in range(0,len(science_list)):
+			count = count+1
 			fltapname = flatprefix+science_list[j]
 			apall(fltapname,count,apname1)
   
