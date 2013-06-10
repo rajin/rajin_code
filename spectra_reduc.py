@@ -411,7 +411,7 @@ def input_str(script):
 
 
 #change this to your home iraf directory (dont forget to save the line list files in that folder)
-irafhome = '/home/vinesh/iraf/'
+irafhome = '/home/rajin/iraf/'
 
 # creating a history directory which will backup all the fits file done in previous steps of reduction
 os.system('mkdir history')
