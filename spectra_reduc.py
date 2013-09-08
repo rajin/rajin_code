@@ -1,7 +1,10 @@
 '''Main code that should be run for the spectral reduction of SALT longslit data
 Please consult the readme file to understand how it works.
 
-Version = 3.1
+Version = 3.2
+
+For proper updated line calibration, please use the atlas found at 
+http://pysalt.salt.ac.za/lineatlas/lineatlas.html
 
 '''
 
@@ -9,7 +12,7 @@ import numpy as np
 #import matplotlib as plt
 from pyraf import iraf
 from pyraf.iraf import noao
-from pyraf.iraf import stsdas
+#from pyraf.iraf import stsdas
 
 import pyfits as pft
 import os,sys,glob,string,time
@@ -21,55 +24,66 @@ import math as mth
 #Function which applies the following iraf task on an ARC image: Identify, Reidentify, Fitcoords, transform
 
 def identify(properties,index,irafhome):
+	#checking if user is satisfied with the arc identification to proceed through the process -> the 1st time it runs the value should
+	#be 'n' so that it goes through the process at least once
 	satis = 'n'
 	while satis == 'n':
 	        properties = np.array(properties)
 		print properties
+		#locating the arc file name
 		filename = properties[index,0]
+		#locating the name of the gas used in the arc to be able to select the appropriate arc-line list
 		lampid = properties[index,2]
 		path = irafhome+lampid+'.txt'
 	 	print path,filename
+		#identify the lamp to wavelength calibrate the source
 		iraf.noao.twodspec.longslit.identify(images=filename, section='middle line', databas='database',
 			            	coordli=path, units='',nsum=10,match=-3., maxfeat=50, zwidth=100.,ftype='emission',
 				    	fwidth=5., cradius=6., thresho=0., minsep=2.,functio='spline3',order=3,sample= '*',
 				    	niterat=0, low_rej=3., high_re=3., grow=0.,autowri='no', graphic='stdgraph', cursor='',  	       					    	crval='',cdelt='',aidpars='',mode='ql')
+		#reidentify the frame to find the places where the lines lies as we go up and down the frame 
 		iraf.noao.twodspec.longslit.reidentify(referenc=filename,images=filename,interac='no',section='middle line',newaps='yes',
 					overrid='no',refit='no',trace='no',step=10.,nsum=10.,shift=0.,search=5.,nlost=10.,
 					cradius=5.,thresho=0.,addfeat='no',coordli=path,match=-3,maxfeat=50,minsep=2,
 					databas='database',logfile='logfile',plotfil='',verbose='yes',graphic='stdgraph',
 					cursor='',answer='yes',crval='',cdelt='',aidpars='',mode='ql')
 		namesplit = string.split(filename,'.')
+		#fitting a function to the lines present to be able to remove curvature of the arc lamp
 		iraf.noao.twodspec.longslit.fitcoords(images=str(namesplit[0]),fitname='',interac='yes',combine='no',
 					databas='database',deletio='deletions.db',
 					functio='chebyshev',xorder=6,yorder=6,logfile='STDOUT,logfile',plotfil='plotfile',
 					graphic='stdgraph',cursor ='',mode='ql')
 		trans = 't'+filename
+		#transforming the arc lamp to make the line become straight
 		iraf.noao.twodspec.longslit.transform(input=filename,output=trans,minput='',moutput='',fitnames=namesplit[0],
 					databas='database',
 					interpt='spline3',x1='INDEF',x2='INDEF',dx='INDEF',nx='INDEF',xlog='no',y1='INDEF',
 					y2='INDEF',dy='INDEF',ny='INDEF',ylog='no',flux='yes',blank='INDEF',
 					logfile='STDOUT,logfile',mode='ql')
-		os.system('ds9 %s &' % (trans))
+		os.system('ds9 %s -zscale &' % (trans))
 		satis = input_str("Are satisfied with the transformed spectra (y|n)? :")
 		if (satis == 'n'):
 			askdel = input_str("Delete the spectra and database (y|n)? :")
 			if (askdel == 'y'):
 				os.system('rm -r database/ %s deletion.db' % (trans))
 		os.system('mv %s %s history/' % (filename,trans))
+		os.system('kill -9 `pidof ds9')
 	return
     
 #------------------------------------------------------------------------------------------------------------------------------------
 #function to fill the ccd gap with an interpolation value
 def ccdgap(name):
+	#opening the fits file
 	fimg = pft.open(name)
 	prihdr = fimg[0].header
 	scidata = fimg[0].data
 
+	#getting the size of the ccd
 	n1 = prihdr['NAXIS1']
 	n2 = prihdr['NAXIS2']
 
-	#below are the 4 coordinates of edge of the ccd gap
-	a = ccd_locate(scidata)[0]-4;b = ccd_locate(scidata)[1]+2;c = ccd_locate(scidata)[2]-2;d = ccd_locate(scidata)[3]+3
+	#below are the 4 coordinates of edge of the ccd gaps
+	a = ccd_locate(scidata)[0]-4 ;b = ccd_locate(scidata)[1]+2 ;c = ccd_locate(scidata)[2]-2 ;d = ccd_locate(scidata)[3]+3
 	e = n2 #ccd height
 
 	gap1_part1 = (scidata[:,a-6:a-1].sum(axis=1))/5.0
@@ -77,15 +91,18 @@ def ccdgap(name):
 	gap2_part1 = (scidata[:,c-6:c-1].sum(axis=1))/5.0
 	gap2_part2 = (scidata[:,d+1:d+6].sum(axis=1))/5.0
 	
+	#calculating the gradient of both interpolation values (2 gradients because we have 2 gaps)
 	grad1 = (gap1_part2-gap1_part1)/((b-a)+5.0)
 	grad2 = (gap2_part2-gap2_part1)/((d-c)+5.0)
 
+	#filling the gap with the interpolated value
 	for i in range(a,b):
 		scidata[:,i] = grad1*((i-a)+2)+gap1_part1
 
 	for i in range(c,d):
 		scidata[:,i] = grad2*((i-c)+2)+gap2_part1
 
+	#saving the data to a new fits file
 	namec = "c"+name
 	pft.writeto(namec,data=scidata,header=prihdr,clobber=True)
 	fimg.close()
@@ -96,11 +113,15 @@ def ccdgap(name):
 #function to help locate the ccd gap automatically
 def ccd_locate(data):
 	sum_col = data.sum(axis=0) # summing over each row of the image
-	first_gap = np.where(sum_col[0:len(sum_col)/2] == 0)[0]
-	second_gap = (len(sum_col)/2)+np.where(sum_col[len(sum_col)/2:] == 0)[0]
+	#since the gap are regions where the values are 0, then by adding over all rows, it will be the only region where the cummulated 
+	#pixel value will still be 0. Hence we locate the regions where the values are zero.
+	first_gap = (len(sum_col)/4)+np.where(sum_col[(len(sum_col)/4):len(sum_col)/2] == 0)[0]
+	second_gap = (len(sum_col)/2)+np.where(sum_col[len(sum_col)/2:(3*len(sum_col)/4)] == 0)[0]
 	return first_gap[0],first_gap[-1],second_gap[0],second_gap[-1]
 #------------------------------------------------------------------------------------------------------------------------------------
 
+
+#Function to operate LA cosmics - cosmic ray removal tool to apply on the science images 
 def lacosmic(name,irafhome):
 	import time
 	iraf.task(lacos_spec=irafhome+'lacos_spec.cl')
@@ -115,6 +136,8 @@ def lacosmic(name,irafhome):
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
+#function to apply on the science images to perform transformation (wavelength calibration and straightening of the frame) and background
+#removal of the sky
 def science(sciname,filename):
 	# taking the arc file name and using it as the reference input for transformation
 	namesplit = string.split(filename,'.')
@@ -124,18 +147,20 @@ def science(sciname,filename):
 					interpt='linear',x1='INDEF',x2='INDEF',dx='INDEF',nx='INDEF',xlog='no',y1='INDEF',
 					y2='INDEF',dy='INDEF',ny='INDEF',ylog='no',flux='yes',blank='INDEF',
 					logfile='STDOUT,logfile',mode='ql')
-	os.system('ds9 %s &' % (trans))
+	os.system('ds9 %s -zscale &' % (trans))
 	backn = 'b'+trans
 	iraf.noao.twodspec.longslit.background(input=trans,output=backn,axis=2,interac='yes',sample='*',naverag=1,
 					functio='spline3',order=3,low_rej=2.,high_re=1.5,niterat=1,grow=0.,
 					graphic='stdgraph',cursor='',mode='al')
-	os.system('ds9 %s &' % (backn))
+	os.system('ds9 %s -zscale &' % (backn))
 	os.system('mv %s history/' % (sciname))
 	os.system('mv %s history/' % (trans))
 	return
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
+#Function to operate Apall extraction tool to extract interesting apertures (places in the frames where we have signal of the object of
+#interest) 
 def apall(apname,jj,refnam):
 	satis = 'n'
 	while (satis == 'n'):
@@ -160,7 +185,7 @@ def apall(apname,jj,refnam):
 						backgro='none',skybox=1,weights='none',pfit='fit1d',clean='no',saturat='INDEF',
 						readnoi=0.,gain=1.,lsigma=4.,usigma=4.,nsubaps=1.,mode='ql')
 		namesplit = string.split(outname,'.')
-		os.system('ds9 %s &' % (namesplit[0]+'.0001.fits'))
+		os.system('ds9 %s -zscale &' % (namesplit[0]+'.0001.fits'))
 		satis = input_str("Are satisfied with the extracted spectra (y|n)?")
 		if (satis == 'n'):
 			askdel = input_str("Delete the spectra (y|n)?")
@@ -168,9 +193,12 @@ def apall(apname,jj,refnam):
 				os.system('rm %s' % (namesplit[0]+'.0001.fits'))
 		else:
 			os.system('mv %s history/' % (apname))
+		os.system('kill -9 `pidof ds9')
 		return
 
 #------------------------------------------------------------------------------------------------------------------------------------
+
+#function to create error frames from the starting science frames by assuming that the science frames follow poissonian noise
 def err(name,name1):
 	ffts = pft.open(name)
 	prihdr = ffts[0].header
@@ -187,6 +215,7 @@ def err(name,name1):
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
+#
 def transform(name,filename):
 	# taking the arc file name and using it as the reference input for transformation
 	namesplit = string.split(filename,'.')
@@ -200,7 +229,11 @@ def transform(name,filename):
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
+#Another function deal with error frames by dividing the frame with the science counterpart.
+#it is also used when doing flat fielding
 def divide(name1,name2,switch):
+	#name1 is usually the error frame while name2 is the science frame. 
+	#For flat field -> name1 = science image, name2 = master flat field.
 	ffts1 = pft.open(name1)
 	prihdr1 = ffts1[0].header
 	scidata1 = ffts1[0].data
@@ -211,6 +244,8 @@ def divide(name1,name2,switch):
 	for i in range(0,len(x)):
 		scidata2[x[i],y[i]] = 1.
 	scidata3 = abs(scidata1/scidata2)
+
+	#using a switch to allocate which prefix is used in the naming of the frames during saving.
 	if switch == 1:
 		new = 'd'+name1
 	else:
@@ -227,6 +262,7 @@ def divide(name1,name2,switch):
 #function to rename fits file with name which makes much more sense. Also SALT fits files consists usually of 2 layers of header and 1
 #layer of data. This function makes the files become single layer with a header which has all the important information
 def rename(fits_name):
+	#This part is in the case it is the frame directly from SALT with 2 layers
 	try:
 		fimg = pft.open(fits_name)
 		prihdr = fimg[0].header
@@ -254,6 +290,8 @@ def rename(fits_name):
 		prihdr.update('NAXIS', n);prihdr.update('NAXIS1', n1);prihdr.update('NAXIS2', n2)
 		pft.writeto(new_name,data=scidata,header=prihdr,clobber=True)
 		out = 1
+	
+	#This section is in the case that the frame has been process somehow before (during another run of this pipeline) and is single layer
 	except:
 		fimg = pft.open(fits_name)
 		prihdr = fimg[0].header
@@ -300,6 +338,7 @@ def info_fits(fits_name):
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
+# master function which performs flat fielding of the frames.
 def flat(flist):
 	f = open('flatlist','w')
 	for i in range(0,len(flist)):
@@ -333,7 +372,7 @@ def flat(flist):
 					yboxmax=0.25,clip='yes',lowsigm=2.5,highsig=2.5,divbyze=1.,ccdproc='',mode='ql')
 	ccdgap(illum_flat)
 	cillum_flat = 'c'+illum_flat
-	os.system('ds9 %s &' % (cillum_flat))
+	os.system('ds9 %s -zscale &' % (cillum_flat))
 	fimg = pft.open(cillum_flat)
 	prihdr = fimg[0].header
 	scidata = fimg[0].data
@@ -355,9 +394,13 @@ def flat(flist):
 	os.system('mv %s history/' % (combine_flat))
 	os.system('mv %s history/' % (illum_flat))
 	os.system('mv %s history/' % (cillum_flat))
+	os.system('kill -9 `pidof ds9')
 	return
 	
 #------------------------------------------------------------------------------------------------------------------------------------
+
+#In case we want to trim the images, we need to apply trimming across all the frames in the folder
+#This function performs trimming.
 def trim(imname,x,y):
 	fimg = pft.open(imname)
 	prihdr = fimg[0].header
@@ -372,6 +415,8 @@ def trim(imname,x,y):
 	os.system('mv %s history/' % (imname))
 
 #------------------------------------------------------------------------------------------------------------------------------------
+
+#function to get the input value of a user (and deal in the cases of typing mistakes)
 def input_val(script,lim1,lim2):
 	while True:
 	   try:
@@ -387,6 +432,7 @@ def input_val(script,lim1,lim2):
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
+#function written to ask the questions to the user!
 def input_str(script):
 	while True:
 		userInput = str(raw_input('%s' % (script)))
@@ -424,7 +470,7 @@ for i in range(0,len(files)):
 
 #Applying trimming if necessary
 files = glob.glob('*fits')
-os.system('ds9 %s &' % (files[0]))
+os.system('ds9 %s -zscale &' % (files[0]))
 trim_ans = input_str("Do you want to apply any trimming (y|n)?")
 if trim_ans == 'y':
 	satis = 'n'
@@ -437,6 +483,8 @@ if trim_ans == 'y':
 	x = [x0,x1] ; y = [y0,y1]
 	for i in range(0,len(files)):
 		trim(files[i],x,y)
+
+os.system('kill -9 `pidof ds9')
 
 #saving the properties of the fits files in an array
 files = glob.glob('*fits')
@@ -488,6 +536,8 @@ if (lacos == 'y'):
 		mask.append(lacosname)
 	prefix = 'la'+prefix
 
+os.system('kill -9 `pidof ds9')
+
 # Detecting if there are flat field inside the folder and then applying flat field correction to the science image (at the end we will have 
 # 2 sets of science images 1 flat fielded and 1 none flat fielded
 if flat_detec == 'yes':
@@ -524,6 +574,8 @@ for j in range(0,len(science_list)):
 		flsciename = flatprefix+science_list[j]
 		science(flsciename,arc_file)
 
+os.system('kill -9 `pidof ds9')
+
 prefix = 'bt'+prefix
 if flat_detec == 'yes':
 	flatprefix = 'bt'+flatprefix
@@ -558,7 +610,8 @@ if (len(errorflt) != 0):
 		divide(flterrname,fltsciename,1)
 		i = i+1
 	prefixerrflt = 'd'+prefixerrflt
-	
+
+os.system('kill -9 `pidof ds9')
 
 apname1=''
 apallext = input_str("Do you want to extract your 2D aperture and correct for tilt(y|n)? :")
@@ -586,3 +639,4 @@ if (apallext == 'y'):
 		for j in range(0,len(errorflt)):
 			apall(prefixerrflt+errorflt[j],2,apname1)
 
+os.system('kill -9 `pidof ds9')
