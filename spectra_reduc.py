@@ -1,7 +1,7 @@
 '''Main code that should be run for the spectral reduction of SALT longslit data
 Please consult the readme file to understand how it works.
 
-Version = 3.5
+Version = 4.0
 
 For proper updated line calibration, please use the atlas found at 
 http://pysalt.salt.ac.za/lineatlas/lineatlas.html
@@ -15,7 +15,7 @@ from pyraf.iraf import noao
 #from pyraf.iraf import stsdas
 
 import pyfits as pft
-import os,sys,glob,string,time
+import os,sys,glob,string,time,subprocess
 import math as mth
 
 
@@ -60,14 +60,14 @@ def identify(properties,index,irafhome):
                                         interpt='spline3',x1='INDEF',x2='INDEF',dx='INDEF',nx='INDEF',xlog='no',y1='INDEF',
                                         y2='INDEF',dy='INDEF',ny='INDEF',ylog='no',flux='yes',blank='INDEF',
                                         logfile='STDOUT,logfile',mode='ql')
-                os.system('ds9 %s -zscale &' % (trans))
-                satis = input_str("Are satisfied with the transformed spectra (y|n)? :")
+                pidds9 = subprocess.Popen(['ds9', trans, '-zscale']).pid
+                satis = input_str("\nAre satisfied with the transformed spectra (y|n)? :")
                 if (satis == 'n'):
-                        askdel = input_str("Delete the spectra and database (y|n)? :")
+                        askdel = input_str("\nDelete the spectra and database (y|n)? :")
                         if (askdel == 'y'):
                                 os.system('rm -r database/ %s deletion.db' % (trans))
                 os.system('mv %s %s history/' % (filename,trans))
-                os.system('kill -9 `pidof ds9`')
+                os.system('kill %s' % (pidds9))
         return
     
 #------------------------------------------------------------------------------------------------------------------------------------
@@ -122,17 +122,17 @@ def ccd_locate(data):
 
 
 #Function to operate LA cosmics - cosmic ray removal tool to apply on the science images 
-def lacosmic(name,irafhome):
+def lacosmic(name,irafhome,la_iter):
         import time
         iraf.task(lacos_spec=irafhome+'lacos_spec.cl')
         outname = 'la'+name
         pl = 'mask'+name
         iraf.lacos_spec(input=name,output=outname,outmask=pl,gain=1.,readn=2.89,
-                                xorder=9,yorder=0,sigclip=4.5,sigfrac=0.5,objlim=1.,niter=7,verbose='yes',mode='al')
+                                xorder=9,yorder=0,sigclip=4.5,sigfrac=0.5,objlim=1.,niter=la_iter,verbose='yes',mode='al')
         old = time.time()
-        os.system('ds9 %s %s &' % (pl,outname))
+        pidds9 = subprocess.Popen(['ds9', pl, outname, '-zscale']).pid
         os.system('mv %s history/' % (name))
-        return
+        return pidds9
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
@@ -147,15 +147,15 @@ def science(sciname,filename):
                                         interpt='linear',x1='INDEF',x2='INDEF',dx='INDEF',nx='INDEF',xlog='no',y1='INDEF',
                                         y2='INDEF',dy='INDEF',ny='INDEF',ylog='no',flux='yes',blank='INDEF',
                                         logfile='STDOUT,logfile',mode='ql')
-        os.system('ds9 %s -zscale &' % (trans))
+        pidds9_1 = subprocess.Popen(['ds9', trans, '-zscale']).pid
         backn = 'b'+trans
         iraf.noao.twodspec.longslit.background(input=trans,output=backn,axis=2,interac='yes',sample='*',naverag=1,
                                         functio='spline3',order=3,low_rej=2.,high_re=1.5,niterat=1,grow=0.,
                                         graphic='stdgraph',cursor='',mode='al')
-        os.system('ds9 %s -zscale &' % (backn))
+        pidds9_2 = subprocess.Popen(['ds9', backn, '-zscale']).pid
         os.system('mv %s history/' % (sciname))
         os.system('mv %s history/' % (trans))
-        return
+        return pidds9_1,pidds9_2
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
@@ -185,7 +185,7 @@ def apall(apname,jj,refnam):
                                                 backgro='none',skybox=1,weights='none',pfit='fit1d',clean='no',saturat='INDEF',
                                                 readnoi=0.,gain=1.,lsigma=4.,usigma=4.,nsubaps=1.,mode='ql')
                 namesplit = string.split(outname,'.')
-                os.system('ds9 %s -zscale &' % (namesplit[0]+'.0001.fits'))
+                pidds9 = subprocess.Popen(['ds9', namesplit[0]+'.0001.fits', '-zscale']).pid
                 satis = input_str("Are satisfied with the extracted spectra (y|n)?")
                 if (satis == 'n'):
                         askdel = input_str("Delete the spectra (y|n)?")
@@ -193,8 +193,8 @@ def apall(apname,jj,refnam):
                                 os.system('rm %s' % (namesplit[0]+'.0001.fits'))
                 else:
                         os.system('mv %s history/' % (apname))
-                os.system('kill -9 `pidof ds9`')
-                return
+                os.system('kill %s' % (pidds9))
+	return
 
 #------------------------------------------------------------------------------------------------------------------------------------
 
@@ -247,7 +247,7 @@ def divide(name1,name2,switch):
 
         #using a switch to allocate which prefix is used in the naming of the frames during saving.
         if switch == 1:
-                new = 'd'+name1
+                new = 'd'+name2
         else:
                 new = 'fl'+name1
 
@@ -354,7 +354,10 @@ def flat(flist):
                                         nkeep=1,mclip='yes',lsigma=3.,hsigma =3.,rdnoise=0.,gain=1.,snoise =0.,sigscal=0.1,
                                         pclip=-0.5,grow=0.,mode='ql')
 
-        illum_flat = 'il'+combine_flat
+        ccdgap(combine_flat)
+        ccom_flat = 'c'+combine_flat
+
+	illum_flat = 'il'+ccom_flat
 
         iraf.noao.imred.ccdred.ccdproc.noproc='no'
         iraf.noao.imred.ccdred.ccdproc.fixpix='no'
@@ -368,12 +371,11 @@ def flat(flist):
         iraf.noao.imred.ccdred.ccdproc.readcor='no'
         iraf.noao.imred.ccdred.ccdproc.scancor='no'
 
-        iraf.noao.imred.ccdred.mkillumflat(input=combine_flat,output=illum_flat,ccdtype='',xboxmin=3.,xboxmax=5,yboxmin=3.,
+        iraf.noao.imred.ccdred.mkillumflat(input=ccom_flat,output=illum_flat,ccdtype='',xboxmin=3.,xboxmax=5,yboxmin=3.,
                                         yboxmax=5,clip='yes',lowsigm=2.5,highsig=2.5,divbyze=1.,ccdproc='',mode='ql')
-        ccdgap(illum_flat)
-        cillum_flat = 'c'+illum_flat
-        os.system('ds9 %s -zscale &' % (cillum_flat))
-        fimg = pft.open(cillum_flat)
+
+	pidds9 = subprocess.Popen(['ds9', illum_flat, '-zscale']).pid
+        fimg = pft.open(illum_flat)
         prihdr = fimg[0].header
         scidata = fimg[0].data
         n1 = prihdr['NAXIS1']
@@ -391,10 +393,10 @@ def flat(flist):
         pft.writeto(new_name,data=scidata1,header=prihdr,clobber=True)
         for i in range(0,len(flist)):
                 os.system('mv %s history/' % (flist[i]))
-        os.system('mv %s history/' % (combine_flat))
+        #os.system('mv %s history/' % (combine_flat))
+        os.system('mv %s history/' % (ccom_flat))
         os.system('mv %s history/' % (illum_flat))
-        os.system('mv %s history/' % (cillum_flat))
-        os.system('kill -9 `pidof ds9`')
+        os.system('kill %s' % (pidds9))
         return
         
 #------------------------------------------------------------------------------------------------------------------------------------
@@ -479,8 +481,10 @@ qst6 = "Do you want to extract your 2D aperture and correct for tilt(y|n)? :"			
 #tr_y0, ending y in tr_y1, starting x in tr_x0 and ending x in tr_x1
 trim_val = 'd'
 tr_y0 = 0 ; tr_y1 = 0 ; tr_x0 = 0 ; tr_x1 = 0
-#dont touch the list below
+#dont touch the list just below
 trimlist = [tr_y0,tr_y1,tr_x0,tr_x1]
+#Number of iterations for La-Cosmics (usually best results are from 4-7)
+lacos_iter = 7
 #------------------------>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-----------------------------------------------
 #			 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 #------------------------>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<-----------------------------------------------
@@ -498,13 +502,13 @@ for i in range(0,len(files)):
 #Applying trimming if necessary
 files = glob.glob('*fits')
 if ans1 == 'd':
-	os.system('ds9 %s -zscale &' % (files[0]))
+	pidds9 = subprocess.Popen(['ds9', files[0], '-zscale']).pid
 	trim_ans = input_str("Do you want to apply any trimming (y|n)?")
 else:
 	trim_ans = ans1
 if trim_ans == 'y':
 	if ans1 != 'd':
-		os.system('ds9 %s -zscale &' % (files[0]))
+		pidds9 = subprocess.Popen(['ds9', files[0], '-zscale']).pid
 	if trim_val == 'd':
      		satis = 'n'
         	while satis == 'n' or satis =='no':
@@ -519,7 +523,7 @@ if trim_ans == 'y':
         for i in range(0,len(files)):
                 trim(files[i],x,y)
 
-os.system('kill -9 `pidof ds9`')
+os.system('kill %s' % (pidds9))
 
 #saving the properties of the fits files in an array
 files = glob.glob('*fits')
@@ -572,14 +576,16 @@ if ans4 == 'd':
 else:
 	lacos = ans4
 mask = []
+out_lacos = []
 if (lacos == 'y'):
         for j in range(0,len(science_list)):
                 lacosname = prefix+science_list[j]
-                lacosmic(lacosname,irafhome)
+                out_lacos.append(lacosmic(lacosname,irafhome,lacos_iter))
                 mask.append(lacosname)
         prefix = 'la'+prefix
 
-os.system('kill -9 `pidof ds9`')
+for i in range(0,len(out_lacos)-1):
+	os.system('kill %s' % (out_lacos[i]))
 
 # Detecting if there are flat field inside the folder and then applying flat field correction to the science image (at the end we will have 
 # 2 sets of science images 1 flat fielded and 1 none flat fielded
@@ -611,17 +617,24 @@ if (errorans == 'y'):
                         err(flt_name,flt_err_name)
                         errorflt.append(flt_err_name)
 
+os.system('kill %s' % (out_lacos[-1]))
 
+out_sc = []
 print 'Applying wavelength calibration and background subtraction on science data'
 for j in range(0,len(science_list)):
         sciename = prefix+science_list[j]
-        science(sciename,arc_file)
+        sc_out = science(sciename,arc_file)
+	out_sc.append(sc_out[0])
+	out_sc.append(sc_out[1])
         if flat_detec == 'yes':
 		print 'Applying wavelength calibration and background subtraction on flat fielded science data'
                 flsciename = flatprefix+science_list[j]
-                science(flsciename,arc_file)
+		sc_out = science(flsciename,arc_file)
+                out_sc.append(sc_out[0])
+		out_sc.append(sc_out[1])
 
-os.system('kill -9 `pidof ds9`')
+for i in range(0,len(out_sc)-1):	
+	os.system('kill %s' % (out_sc[i]))
 
 prefix = 'bt'+prefix
 if flat_detec == 'yes':
@@ -644,6 +657,8 @@ if (len(error) != 0):
                 i = i+1
         prefixerr = 'd'+prefixerr
 
+os.system('kill %s' % (out_sc[-1]))
+
 prefixerrflt =''
 if (len(errorflt) != 0):
 # transforming the flat fielded error frames
@@ -660,7 +675,6 @@ if (len(errorflt) != 0):
                 i = i+1
         prefixerrflt = 'd'+prefixerrflt
 
-os.system('kill -9 `pidof ds9`')
 
 apname1=''
 if ans6 == 'd':
@@ -695,4 +709,4 @@ if (apallext == 'y'):
                 for j in range(0,len(errorflt)):
                         apall(prefixerrflt+errorflt[j],2,apname1)
 
-os.system('kill -9 `pidof ds9`')
+os.system('killall ds9')
