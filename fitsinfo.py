@@ -2,9 +2,9 @@ from astropy.io import fits
 import glob
 
 KEYWORDS = ['NAXIS2', 'LAMPID', 'GRATING', 'GR-ANGLE', 'OBJECT']
-keywordValues = []
 
 def get_fits_info(filename):
+    keywordValues = []
     header = fits.getheader(filename)
     for keyword in KEYWORDS:
     	try:
